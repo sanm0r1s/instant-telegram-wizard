@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { CreatedBot, BotStats } from '@/types/bot';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { LogOut, Bot, Template, Users, TrendingUp } from 'lucide-react';
+import { LogOut, Bot, FileText, Users, TrendingUp } from 'lucide-react';
 
 interface AdminDashboardProps {
   onLogout: () => void;
@@ -85,7 +85,7 @@ export const AdminDashboard = ({ onLogout }: AdminDashboardProps) => {
                 {Object.keys(stats.templatesUsage).length}
               </p>
             </div>
-            <Template className="h-12 w-12 text-blue-400" />
+            <FileText className="h-12 w-12 text-blue-400" />
           </div>
         </Card>
 
