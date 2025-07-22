@@ -17,6 +17,7 @@ export interface CreatedBot {
   templates: BotTemplate[];
   createdAt: Date;
   botUrl: string;
+  botUsername?: string;
 }
 
 export interface AdminUser {

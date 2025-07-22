@@ -5,7 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { CreatedBot } from '@/types/bot';
-import { Rocket, ExternalLink, CheckCircle } from 'lucide-react';
+import { Rocket, ExternalLink, CheckCircle, AlertCircle } from 'lucide-react';
+import { TelegramBotService } from '@/services/telegramBot';
+import { useToast } from '@/hooks/use-toast';
 
 interface StepThreeProps {
   builderState: {
@@ -21,30 +23,79 @@ export const StepThree = ({ builderState, onPrev, onBotNameChange }: StepThreePr
   const [isCreating, setIsCreating] = useState(false);
   const [createdBot, setCreatedBot] = useState<CreatedBot | null>(null);
   const [requiredApiKeys, setRequiredApiKeys] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string>('');
+  const { toast } = useToast();
 
   const templatesWithApiKeys = builderState.selectedTemplates.filter(t => t.requiresApiKey);
 
   const createBot = async () => {
     setIsCreating(true);
+    setError('');
     
-    // Simulate bot creation process
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    const newBot: CreatedBot = {
-      id: Date.now().toString(),
-      name: builderState.botName || 'Мой бот',
-      apiToken: builderState.apiToken,
-      templates: builderState.selectedTemplates,
-      createdAt: new Date(),
-      botUrl: `https://t.me/${builderState.botName?.toLowerCase().replace(/\s+/g, '_') || 'mybot'}`
-    };
+    try {
+      // Создаем сервис бота
+      const botService = new TelegramBotService(
+        builderState.apiToken,
+        builderState.selectedTemplates,
+        requiredApiKeys
+      );
 
-    // Save to localStorage
-    const existingBots = JSON.parse(localStorage.getItem('createdBots') || '[]');
-    localStorage.setItem('createdBots', JSON.stringify([...existingBots, newBot]));
+      // Проверяем валидность токена
+      toast({ title: 'Проверка токена...', description: 'Подключаемся к Telegram API' });
+      const validation = await botService.validateToken();
+      
+      if (!validation.valid) {
+        throw new Error(validation.error || 'Неверный API токен');
+      }
 
-    setCreatedBot(newBot);
-    setIsCreating(false);
+      // Настройка бота
+      toast({ title: 'Настройка бота...', description: 'Подключаем шаблоны' });
+      
+      // В реальном приложении здесь бы настраивался webhook
+      // const webhookUrl = `https://your-server.com/webhook/${builderState.apiToken}`;
+      // await botService.setWebhook(webhookUrl);
+
+      const newBot: CreatedBot = {
+        id: Date.now().toString(),
+        name: builderState.botName || 'Мой бот',
+        apiToken: builderState.apiToken,
+        templates: builderState.selectedTemplates,
+        createdAt: new Date(),
+        botUrl: `https://t.me/${validation.botInfo.username}`,
+        botUsername: validation.botInfo.username
+      };
+
+      // Сохраняем в localStorage
+      const existingBots = JSON.parse(localStorage.getItem('createdBots') || '[]');
+      localStorage.setItem('createdBots', JSON.stringify([...existingBots, newBot]));
+
+      // Сохраняем конфигурацию бота для обработки сообщений
+      const botConfigs = JSON.parse(localStorage.getItem('botConfigs') || '{}');
+      botConfigs[builderState.apiToken] = {
+        templates: builderState.selectedTemplates,
+        apiKeys: requiredApiKeys,
+        createdAt: new Date().toISOString()
+      };
+      localStorage.setItem('botConfigs', JSON.stringify(botConfigs));
+
+      toast({ 
+        title: 'Успешно!', 
+        description: 'Бот создан и готов к использованию',
+        duration: 3000
+      });
+
+      setCreatedBot(newBot);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Неизвестная ошибка';
+      setError(errorMessage);
+      toast({ 
+        title: 'Ошибка создания бота', 
+        description: errorMessage,
+        variant: 'destructive'
+      });
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   if (createdBot) {
@@ -64,16 +115,29 @@ export const StepThree = ({ builderState, onPrev, onBotNameChange }: StepThreePr
           <h4 className="font-semibold text-green-800 mb-3">Информация о боте:</h4>
           <div className="space-y-2 text-sm">
             <div><strong>Название:</strong> {createdBot.name}</div>
+            <div><strong>Username:</strong> @{createdBot.botUsername}</div>
             <div><strong>Шаблоны:</strong> {createdBot.templates.length}</div>
             <div><strong>Создан:</strong> {createdBot.createdAt.toLocaleString('ru-RU')}</div>
           </div>
+          
+          <div className="mt-4 p-3 bg-green-100 rounded-lg">
+            <p className="text-xs text-green-700 mb-2">
+              <strong>Активные возможности:</strong>
+            </p>
+            <ul className="text-xs text-green-600 space-y-1">
+              {createdBot.templates.map(template => (
+                <li key={template.id}>• {template.name}</li>
+              ))}
+            </ul>
+          </div>
+
           <a
             href={createdBot.botUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 mt-4 text-green-600 hover:text-green-800 font-medium"
           >
-            Открыть бота
+            Открыть бота в Telegram
             <ExternalLink className="h-4 w-4" />
           </a>
         </Card>
@@ -139,6 +203,16 @@ export const StepThree = ({ builderState, onPrev, onBotNameChange }: StepThreePr
           </div>
         )}
 
+        {error && (
+          <Card className="p-4 bg-red-50 border-red-200">
+            <div className="flex items-center gap-2 text-red-800">
+              <AlertCircle className="h-5 w-5" />
+              <span className="font-medium">Ошибка:</span>
+            </div>
+            <p className="text-sm text-red-600 mt-1">{error}</p>
+          </Card>
+        )}
+
         <Card className="p-4 bg-blue-50 border-blue-200">
           <h4 className="font-semibold text-blue-900 mb-2">Выбранные шаблоны:</h4>
           <div className="space-y-1">
@@ -148,6 +222,9 @@ export const StepThree = ({ builderState, onPrev, onBotNameChange }: StepThreePr
                 <span>{template.name}</span>
               </div>
             ))}
+          </div>
+          <div className="mt-3 text-xs text-blue-600">
+            💡 После создания бот автоматически получит все возможности выбранных шаблонов
           </div>
         </Card>
 
