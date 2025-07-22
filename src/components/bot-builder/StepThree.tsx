@@ -78,6 +78,10 @@ export const StepThree = ({ builderState, onPrev, onBotNameChange }: StepThreePr
       };
       localStorage.setItem('botConfigs', JSON.stringify(botConfigs));
 
+      // Запускаем бота для обработки сообщений
+      const { WebhookHandler } = await import('@/services/webhookHandler');
+      WebhookHandler.registerBot(builderState.apiToken, botService);
+
       toast({ 
         title: 'Успешно!', 
         description: 'Бот создан и готов к использованию',

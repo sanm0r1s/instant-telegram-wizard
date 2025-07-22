@@ -4,13 +4,18 @@ import { TelegramBotService } from './telegramBot';
 export class WebhookHandler {
   private static botServices: Map<string, TelegramBotService> = new Map();
 
-  // Регистрация бота в системе
+  // Регистрация бота в системе и начало опроса
   static registerBot(apiToken: string, botService: TelegramBotService): void {
     this.botServices.set(apiToken, botService);
+    botService.startPolling(); // Начинаем опрос сообщений
   }
 
-  // Удаление бота из системы
+  // Удаление бота из системы и остановка опроса
   static unregisterBot(apiToken: string): void {
+    const botService = this.botServices.get(apiToken);
+    if (botService) {
+      botService.destroy(); // Останавливаем опрос
+    }
     this.botServices.delete(apiToken);
   }
 
